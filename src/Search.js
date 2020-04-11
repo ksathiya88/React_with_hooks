@@ -1,76 +1,108 @@
+import React, {
+  useState,
+  useEffect,
+  useReducer,
+  useCallback,
+  useMemo,
+  useRef,
+} from "react";
+import LoadingIndicator from "./UI/LoadingIndicator";
+import ErrorModal from "./UI/ErrorModal";
+import Card from "./UI/Card";
+import Axios from "axios";
 
-import Card from './UI/Card';
-import './Search.css';
-import { useState, useEffect,useRef, useReducer, useCallback } from 'react';
-import React from 'react';
-import axios from 'axios';
-import LoadingIndicator from './UI/LoadingIndicator';
-import ErrorModal from './UI/ErrorModal';
+const httpReducer = (intialState, actions) => {
+  switch (actions.type) {
+    case "pending":
+      return { loading: true, error: "" };
+    case "completed":
+      return { loading: false, error: "" };
+    case "error":
+      return { loading: false, error: actions.payload };
+    case "clear":
+      return { loading: false, error: "" };
+  }
+};
 
+const Search = (props) => {
+  const [useFilter, setFilter] = useState("");
+  const [value1, setValue1] = useState(0);
+  const [value2, setValue2] = useState(1);
+  const [state, dispatch] = useReducer(httpReducer, {
+    loading: false,
+    error: "",
+  });
+  const ref1 = useRef();
 
-const reducerStore = (currentIngredentiats,action)=>{
-switch(action.type){
-    case "COMPLETED":
-        return {"loading":false,"error":null}
-    case "PENDING":
-        return {"loading":true,"error":null}
-    case "ERROR":
-        return {"loading":false,"error":true} 
-    case "CLEAR":
-        return {"loading":false,"error":null}    
-}
-}
+  useEffect(() => {
+    dispatch({ type: "pending" });
 
-const Search = React.memo((props) => {
+    const timer = setTimeout(() => {
+      console.log("value1", useFilter);
+      console.log("value2", ref1.current.value);
+      if (useFilter == ref1.current.value) {
+        Axios.get("http://localhost:8081/getEmployees/").then(
+          (employees) => {
+            dispatch({ type: "completed" });
+            console.log("hello", employees);
+            props.setEmployees(employees.data);
+          },
+          (error) => {
+            dispatch({ type: "error", payload: error.message });
+          }
+        );
+      }
+    }, 500);
+    //);
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [useFilter]);
 
-    const [enteredFilter,setEnteredFilter]= useState('');
-    const {onGetEmployees} = props;
-    const inputRef = useRef();
-    const [httpState,dispatch] = useReducer(reducerStore,{})
+  const callback = useCallback(() => {
+    console.log("Callback called");
+  }, []);
 
+  const sum = useMemo(() => {
+    console.log("Sum called");
+    return value1 + value2;
+  }, [value1, value2, callback]);
 
-    const clearError = useCallback(() => {
-        dispatch({ type: 'CLEAR' });
-      }, []);
-
-    useEffect(()=>{
-        const timer = setTimeout(()=>{
-            if(enteredFilter===inputRef.current.value){
-         dispatch({"type":"PENDING"});
-        axios.get('http://localhost:8081/getEmployees111').then((employees) => {
-            console.log("Employees", employees);
-            onGetEmployees(employees.data);
-            dispatch({"type":"COMPLETED"});
-        },(error)=>{
-           dispatch({"type":"ERROR"});
-        });
-    }
-    },500);
-
-    return (()=>{
-        clearTimeout(timer);
-    });
-
-    },[enteredFilter]);
-
-
-    return (
-        <section className="search">
+  return (
+    <section className="search">
       <Card>
-        <div className="search-input">
-          <label>Filter by Title</label>
-          <input
-            type="text"
-            ref={inputRef}
-            value={enteredFilter}
-            onChange={event => setEnteredFilter(event.target.value)}
-          />
-        </div>
+        <label> Enter Name to Filter</label>
+        <input
+          type="text"
+          value={useFilter}
+          ref={ref1}
+          onChange={(event) => {
+            setFilter(event.target.value);
+          }}
+        ></input>
+        <input
+          type="text"
+          value={value1}
+          onChange={(event) => {
+            setValue1(event.target.value);
+          }}
+        ></input>
+        <input
+          type="text"
+          value={value2}
+          onChange={(event) => {
+            setValue2(event.target.value);
+          }}
+        ></input>
+        <label>Sum</label>:{sum}
       </Card>
-      {httpState.loading && <LoadingIndicator/>}
-      {httpState.error && <ErrorModal onClose={clearError}>{httpState.error}</ErrorModal>}
+      {state.loading && <LoadingIndicator></LoadingIndicator>}
+      {state.error && <ErrorModal
+          onClose={() => {
+            dispatch({ type: "CLEAR" });
+          }}}
     </section>
-    )
-});
+  );
+};
 
 export default Search;
